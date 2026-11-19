@@ -333,7 +333,7 @@ footer { border-top: 1px solid var(--line); padding-block: clamp(56px, 8vw, 96px
 .ask-intro { font-family: var(--f-display); font-size: 26px; font-weight: 600; line-height: 1.1; letter-spacing: -.01em; margin: 6px 0 4px; }
 .msg { max-width: 88%; padding: 10px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; animation: msgIn .35s var(--ease); }
 @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } }
-.msg.me { align-self: flex-end; background: var(--copper); color: var(--ink); border-bottom-right-radius: 4px; }
+.msg.from-me { align-self: flex-end; background: var(--copper); color: var(--ink); border-bottom-right-radius: 4px; }
 .msg.bot { align-self: flex-start; background: var(--ink-3); border-bottom-left-radius: 4px; }
 .msg.bot a { color: var(--copper); }
 .typing span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); margin-right: 3px; animation: bob 1s ease-in-out infinite; }
@@ -804,7 +804,7 @@ test('TC-01 invoice saves under 2s', async ({ page }) => { /* ... */ });
   };
   const send = q => {
     q = q.trim(); if (!q) return;
-    add(esc(q), 'me');
+    add(esc(q), 'from-me');
     const t = add('<span class="typing"><span></span><span></span><span></span></span>', 'bot');
     setTimeout(() => { t.innerHTML = answer(q); log.scrollTop = log.scrollHeight; }, 650);
   };
