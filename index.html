@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f0d15">
+<meta name="theme-color" content="#110b0c">
 <meta property="og:title" content="Mehfil PP · Full-Stack Developer">
 <meta property="og:description" content="Angular & .NET developer building a production multi-tenant ERP, with AI-assisted engineering.">
 <meta property="og:image" content="https://mehfil84.github.io/assets/og.jpg">
@@ -20,15 +20,15 @@
 /* Layout: one dark column. Hero = giant two-line headline with the cut-out portrait standing in
    front of it; folder-card projects; footer where the portrait stands beside a commit graph that spells the name. */
 :root {
-  --ink: #0f0d15;          /* Stimes dark --bg */
-  --ink-2: #1a1722;        /* raised surfaces */
-  --ink-3: #211d2b;        /* folder bodies, inputs */
-  --line: #342e42;         /* hairlines */
-  --paper: #ece8f5;        /* primary text */
-  --muted: #9d96ad;        /* secondary text */
-  --accent: #a855f7;       /* Stimes brand purple (brand-500) */
-  --accent-soft: #a855f733;
-  --g0: #1c1826; --g1: #2a2140; --g2: #43286e; --g3: #6d28d9; --g4: #b57bff;  /* commit-graph ramp */
+  --ink: #110b0c;          /* Stimes dark --bg */
+  --ink-2: #1c1314;        /* raised surfaces */
+  --ink-3: #26191b;        /* folder bodies, inputs */
+  --line: #3f2a2d;         /* hairlines */
+  --paper: #f4eaea;        /* primary text */
+  --muted: #ab9a9c;        /* secondary text */
+  --accent: #ef4444;       /* Stimes brand purple (brand-500) */
+  --accent-soft: #ef444433;
+  --g0: #1d1516; --g1: #33191c; --g2: #5c1d23; --g3: #a3191f; --g4: #ff5c5c;  /* commit-graph ramp */
   --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
   --f-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
@@ -81,7 +81,7 @@ h2 { font-family: var(--f-display); font-weight: 600; font-size: clamp(34px, 5vw
 .hero { position: relative; padding-block: clamp(84px, 10vw, 120px) 0; overflow: hidden; isolation: isolate; }
 .spot {
   position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 45%), #a855f726, transparent 65%);
+  background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 45%), #ef444426, transparent 65%);
   transition: background .1s;
 }
 .codebg {
@@ -180,7 +180,7 @@ h2 { font-family: var(--f-display); font-weight: 600; font-size: clamp(34px, 5vw
   position: absolute; max-width: none; width: 225.9%; left: -63.2%; top: -124.7%;
   filter: grayscale(1) contrast(1.18) brightness(.92); transition: filter .8s ease, transform 1.2s var(--ease); transform-origin: 50% 60%;
 }
-.snap .frame::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 40%, transparent 55%, #000a 100%), linear-gradient(transparent 70%, #0f0d15cc); }
+.snap .frame::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 40%, transparent 55%, #000a 100%), linear-gradient(transparent 70%, #110b0ccc); }
 .snap:hover .frame img { filter: grayscale(0) contrast(1) brightness(1); transform: scale(1.04); }
 .snap figcaption { font-family: var(--f-mono); font-size: 12px; color: var(--muted); padding-top: 10px; display: flex; justify-content: space-between; gap: 12px; }
 @media (max-width: 800px) { .about-grid { grid-template-columns: 1fr; } .snap { max-width: 380px; } }
@@ -210,9 +210,9 @@ h2 { font-family: var(--f-display); font-weight: 600; font-size: clamp(34px, 5vw
 .folder .sheet {
   position: absolute; left: 10%; right: 10%; top: 30px; height: 70%; border-radius: 4px;
   background: var(--paper); transition: transform .45s var(--ease);
-  padding: 10px 12px; font-family: var(--f-mono); font-size: 9px; line-height: 1.6; color: #1f0e3d; overflow: hidden;
+  padding: 10px 12px; font-family: var(--f-mono); font-size: 9px; line-height: 1.6; color: #3a0d10; overflow: hidden;
 }
-.folder .sheet.s2 { left: 16%; right: 6%; top: 34px; background: #d2b5f0; transform: rotate(3deg); }
+.folder .sheet.s2 { left: 16%; right: 6%; top: 34px; background: #f5b5b5; transform: rotate(3deg); }
 .folder:hover .sheet.s1, .folder:focus-visible .sheet.s1 { transform: translateY(-30px) rotate(-3deg); }
 .folder:hover .sheet.s2, .folder:focus-visible .sheet.s2 { transform: translateY(-16px) rotate(6deg); }
 .folder .front {
@@ -259,7 +259,7 @@ dialog.case::backdrop { background: #000b; backdrop-filter: blur(4px); }
 @media (max-width: 700px) { .xp-row { grid-template-columns: 1fr; gap: 10px; } }
 
 /* ---------- Footer: the main character ---------- */
-footer { border-top: 1px solid var(--line); padding-block: clamp(56px, 8vw, 96px) 28px; background: radial-gradient(ellipse at 50% 120%, #24123f 0%, var(--ink) 60%); overflow: hidden; }
+footer { border-top: 1px solid var(--line); padding-block: clamp(56px, 8vw, 96px) 28px; background: radial-gradient(ellipse at 50% 120%, #3a1012 0%, var(--ink) 60%); overflow: hidden; }
 .f-top { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 32px; }
 .f-top > * { min-width: 0; }
 .f-top .bye { font-family: var(--f-display); font-weight: 600; font-size: clamp(34px, 5vw, 60px); line-height: 1; letter-spacing: -.02em; margin: 0; }
@@ -282,7 +282,7 @@ footer { border-top: 1px solid var(--line); padding-block: clamp(56px, 8vw, 96px
 .graph i[data-l="1"] { background: var(--g1); }
 .graph i[data-l="2"] { background: var(--g2); }
 .graph i[data-l="3"] { background: var(--g3); }
-.graph i[data-l="4"] { background: var(--g4); box-shadow: 0 0 12px -2px #a855f780; }
+.graph i[data-l="4"] { background: var(--g4); box-shadow: 0 0 12px -2px #ef444480; }
 .graph i:hover { transform: scale(1.6); position: relative; z-index: 2; }
 .graph.build i[data-name] { animation: commit .6s var(--ease) both; animation-delay: calc(var(--c) * 40ms + var(--r) * 20ms); }
 @keyframes commit { 0% { transform: scale(.2); background: var(--g1); } 60% { transform: scale(1.35); } }
