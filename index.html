@@ -115,6 +115,10 @@ h2 { font-family: var(--f-display); font-weight: 600; font-size: clamp(34px, 5vw
   transition: filter .7s ease;
   animation: standUp 1.3s var(--ease) both .55s;
 }
+/* three.js particle portrait: drawn over the same box; the photo stays as the fallback */
+.particles { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; display: block; pointer-events: none; opacity: 0; transition: opacity .8s ease; }
+.stage.has-3d .particles { opacity: 1; }
+.stage.has-3d .me { visibility: hidden; }
 .me:hover { filter: grayscale(0) contrast(1) brightness(1) drop-shadow(0 24px 30px #0006); }
 @keyframes standUp { from { transform: translateX(-50%) translateY(18%) scale(.92); opacity: 0; } }
 .badge {
@@ -383,6 +387,7 @@ img { max-width: 100%; }
           <span class="line split outline">Developer<span class="br">/&gt;</span></span>
         </h1>
         <img class="me" id="me" src="assets/cutout.webp" alt="Mehfil, smiling, hands in pockets">
+        <canvas class="particles" id="particles" aria-hidden="true"></canvas>
         <div class="badge b1" style="--d:0" data-depth="18"><span><b>&lt;/&gt;</b> Angular</span></div>
         <div class="badge b2" style="--d:1" data-depth="-14"><span><b>#</b> .NET Core</span></div>
         <div class="badge b3" style="--d:2" data-depth="-22"><span><b>✳</b> Claude Code</span></div>
@@ -810,6 +815,168 @@ test('TC-01 invoice saves under 2s', async ({ page }) => { /* ... */ });
   };
   document.getElementById('askForm').addEventListener('submit', e => { e.preventDefault(); const i = document.getElementById('askInput'); send(i.value); i.value = ''; });
 })();
+</script>
+
+<script type="module">
+/* Particle portrait: the cut-out photo is sampled into points that assemble into the figure,
+   ripple away from the pointer and scatter on scroll. If WebGL, the CDN or motion is unavailable,
+   nothing here runs and the photo stays. */
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('particles');
+const hero = document.getElementById('hero');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function webglOk() {
+  try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; }
+}
+
+async function start() {
+  if (reduce || !webglOk()) return;
+  const img = new Image();
+  img.src = document.getElementById('me').currentSrc || 'assets/cutout.webp';
+  await img.decode();
+
+  // sample the cutout on a small grid; fewer points on narrow screens
+  const narrow = innerWidth < 700;
+  const sw = narrow ? 110 : 185;
+  const sh = Math.round(sw * img.naturalHeight / img.naturalWidth);
+  const sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
+  const sx = sc.getContext('2d', { willReadFrequently: true });
+  sx.drawImage(img, 0, 0, sw, sh);
+  const px = sx.getImageData(0, 0, sw, sh).data;
+
+  const cells = [];
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+    const i = (y * sw + x) * 4;
+    if (px[i + 3] < 140) continue;
+    let lum = (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) / 255;
+    lum = Math.min(1, Math.max(0, (lum - 0.45) * 1.5 + 0.5)); // contrast boost, like the B&W photo
+    lum = Math.pow(lum, 0.8);                                   // lift mid-tones so the face keeps its detail
+    cells.push([x, y, lum]);
+  }
+  const n = cells.length;
+  const pos = new Float32Array(n * 3), startPos = new Float32Array(n * 3), rand = new Float32Array(n), lum = new Float32Array(n);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000);
+
+  const uniforms = {
+    uProgress: { value: 0 }, uTime: { value: 0 }, uScatter: { value: 0 },
+    uMouse: { value: new THREE.Vector2(1e5, 1e5) }, uMouseR: { value: 90 },
+    uSize: { value: 3 }, uPR: { value: renderer.getPixelRatio() },
+    uBottom: { value: 0 }, uFade: { value: 1 },
+    uDark: { value: new THREE.Color(css('--g3') || '#7f1d1d') },
+    uLight: { value: new THREE.Color(css('--paper') || '#f4eaea') },
+    uAccent: { value: new THREE.Color(css('--accent') || '#b91c1c') },
+  };
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aStart', new THREE.BufferAttribute(startPos, 3));
+  geo.setAttribute('aRand', new THREE.BufferAttribute(rand, 1));
+  geo.setAttribute('aLum', new THREE.BufferAttribute(lum, 1));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms, transparent: true, depthWrite: false, depthTest: false,
+    vertexShader: `
+      attribute vec3 aStart; attribute float aRand; attribute float aLum;
+      uniform float uProgress, uTime, uScatter, uSize, uPR, uMouseR, uBottom, uFade;
+      uniform vec2 uMouse;
+      varying float vAlpha; varying float vLum;
+      void main() {
+        float t = clamp((uProgress - aRand * 0.45) / 0.55, 0.0, 1.0);
+        t = 1.0 - pow(1.0 - t, 3.0);
+        vec3 p = mix(aStart, position, t);
+        p.x += sin(uTime * 1.4 + aRand * 40.0 + position.y * 0.03) * 1.1 * t;
+        p.y += cos(uTime * 1.2 + aRand * 30.0 + position.x * 0.03) * 1.1 * t;
+        vec2 d = p.xy - uMouse; float L = length(d);
+        float f = smoothstep(uMouseR, 0.0, L);
+        p.xy += (d / max(L, 0.001)) * f * uMouseR * 0.55;
+        p.xy += (aStart.xy - position.xy) * uScatter * 0.55;
+        p.y -= uScatter * 140.0 * aRand;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = uSize * uPR * (0.65 + aLum * 0.6) * (1.0 + f * 0.8);
+        vLum = aLum;
+        float bottom = smoothstep(uBottom, uBottom + uFade, position.y);
+        vAlpha = mix(1.0, bottom, t) * (1.0 - uScatter * 0.9) * (0.2 + 0.8 * t);
+      }`,
+    fragmentShader: `
+      uniform vec3 uDark, uLight, uAccent;
+      varying float vAlpha; varying float vLum;
+      void main() {
+        vec2 c = gl_PointCoord - 0.5; float r = length(c);
+        if (r > 0.5) discard;
+        float soft = smoothstep(0.5, 0.15, r);
+        vec3 col = mix(vec3(0.10, 0.05, 0.055), uLight, vLum);    // near-black to warm white, like the B&W photo
+        col = mix(col, uAccent, vLum * (1.0 - vLum) * 1.1);        // crimson only in the mid-tones
+        gl_FragColor = vec4(col, soft * vAlpha);
+      }`,
+  });
+  scene.add(new THREE.Points(geo, mat));
+
+  // place the figure exactly where the photo sits: bottom-centred, 88% of the stage height
+  let W = 0, H = 0;
+  const layout = () => {
+    const r = stage.getBoundingClientRect(); W = r.width; H = r.height;
+    renderer.setSize(W, H, false);
+    camera.left = -W / 2; camera.right = W / 2; camera.top = H / 2; camera.bottom = -H / 2; camera.updateProjectionMatrix();
+    const figH = H * 0.88, figW = figH * sw / sh, step = figH / sh, bottomY = -H / 2;
+    for (let k = 0; k < n; k++) {
+      const [x, y, l] = cells[k];
+      pos[k * 3] = -figW / 2 + (x + Math.random()) * step;
+      pos[k * 3 + 1] = bottomY + figH - (y + Math.random()) * step;
+      pos[k * 3 + 2] = 0;
+      lum[k] = l;
+      if (!rand[k]) {
+        rand[k] = Math.random();
+        const a = Math.random() * Math.PI * 2, rad = (0.45 + Math.random() * 0.6) * Math.max(W, H);
+        startPos[k * 3] = Math.cos(a) * rad; startPos[k * 3 + 1] = Math.sin(a) * rad * 0.7; startPos[k * 3 + 2] = 0;
+      }
+    }
+    geo.attributes.position.needsUpdate = true; geo.attributes.aStart.needsUpdate = true;
+    geo.attributes.aRand.needsUpdate = true; geo.attributes.aLum.needsUpdate = true;
+    uniforms.uSize.value = step * 1.5;
+    uniforms.uMouseR.value = Math.max(60, figW * 0.28);
+    uniforms.uBottom.value = bottomY; uniforms.uFade.value = figH * 0.22;
+  };
+  layout();
+  addEventListener('resize', layout);
+
+  // pointer, smoothed
+  const target = new THREE.Vector2(1e5, 1e5);
+  hero.addEventListener('pointermove', e => {
+    const r = stage.getBoundingClientRect();
+    target.set(e.clientX - r.left - W / 2, H / 2 - (e.clientY - r.top));
+  });
+  hero.addEventListener('pointerleave', () => target.set(1e5, 1e5));
+
+  // only animate while the hero is on screen and the tab is visible
+  let visible = true, raf = 0;
+  new IntersectionObserver(es => { visible = es[0].isIntersecting; if (visible && !raf) loop(); }).observe(hero);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && visible && !raf) loop(); });
+
+  const clock = new THREE.Clock(), t0 = performance.now() + 350;
+  function loop() {
+    raf = 0;
+    if (!visible || document.hidden) return;
+    uniforms.uTime.value = clock.getElapsedTime();
+    uniforms.uProgress.value = Math.min(1, Math.max(0, (performance.now() - t0) / 2600));
+    const m = uniforms.uMouse.value;
+    if (target.x > 1e4) m.copy(target); else if (m.x > 1e4) m.copy(target); else m.lerp(target, 0.15);
+    uniforms.uScatter.value = Math.min(1, scrollY / (H * 0.9));
+    renderer.render(scene, camera);
+    raf = requestAnimationFrame(loop);
+  }
+  stage.classList.add('has-3d');
+  loop();
+}
+
+start().catch(() => { stage.classList.remove('has-3d'); });
 </script>
 </body>
 </html>
