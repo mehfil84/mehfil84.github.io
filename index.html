@@ -838,8 +838,6 @@ async function start() {
   const img = new Image();
   img.src = document.getElementById('me').currentSrc || 'assets/cutout.webp';
   await img.decode();
-  try { await document.fonts.load('800 40px "JetBrains Mono"'); } catch {}
-
   // sample the cutout on a small grid; fewer points on narrow screens
   const narrow = innerWidth < 700;
   const sw = narrow ? 110 : 185;
@@ -862,18 +860,7 @@ async function start() {
   const pos = new Float32Array(n * 3), startPos = new Float32Array(n * 3), rand = new Float32Array(n), lum = new Float32Array(n);
   const alt = new Float32Array(n * 3);
 
-  // second shape for hover: a "</>" code symbol drawn on the same sampling grid
-  const tc = document.createElement('canvas'); tc.width = sw; tc.height = sh;
-  const tx = tc.getContext('2d', { willReadFrequently: true });
-  tx.fillStyle = '#fff'; tx.textAlign = 'center'; tx.textBaseline = 'middle';
-  let fs = sw * 0.62;
-  tx.font = `800 ${fs}px "JetBrains Mono", ui-monospace, Consolas, monospace`;
-  fs *= Math.min(1, (sw * 0.96) / tx.measureText('</>').width);
-  tx.font = `800 ${fs}px "JetBrains Mono", ui-monospace, Consolas, monospace`;
-  tx.fillText('</>', sw / 2, sh * 0.42);
-  const td = tx.getImageData(0, 0, sw, sh).data, glyph = [];
-  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) if (td[(y * sw + x) * 4 + 3] > 120) glyph.push([x, y]);
-  for (let i = glyph.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [glyph[i], glyph[j]] = [glyph[j], glyph[i]]; }
+  // hover target: each particle's place in a scrambled cloud around the figure (filled in by layout)
 
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -905,19 +892,19 @@ async function start() {
       void main() {
         float t = clamp((uProgress - aRand * 0.45) / 0.55, 0.0, 1.0);
         t = 1.0 - pow(1.0 - t, 3.0);
-        // hover morph: each particle leaves a little later than the last, so the change ripples
+        // hover scramble: each particle leaves a little later than the last, so the burst ripples out
         float m = clamp((uMorph * 1.4 - aRand * 0.4), 0.0, 1.0);
         m = m * m * (3.0 - 2.0 * m);
         vec3 home = mix(position, aAlt, m);
-        // particles arc outward mid-flight instead of sliding in a straight line
-        home.xy += vec2(sin(aRand * 6.283), cos(aRand * 6.283)) * sin(m * 3.1416) * 40.0;
+        // while scrambled the cloud keeps swirling gently instead of freezing
+        home.xy += vec2(sin(uTime * 0.9 + aRand * 20.0), cos(uTime * 0.8 + aRand * 17.0)) * 14.0 * m;
         vec3 p = mix(aStart, home, t);
         p.x += sin(uTime * 1.4 + aRand * 40.0 + position.y * 0.03) * 1.1 * t;
         p.y += cos(uTime * 1.2 + aRand * 30.0 + position.x * 0.03) * 1.1 * t;
         p.xy += (aStart.xy - position.xy) * uScatter * 0.55;
         p.y -= uScatter * 140.0 * aRand;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-        gl_PointSize = uSize * uPR * mix(0.65 + aLum * 0.6, 1.05, m);
+        gl_PointSize = uSize * uPR * (0.65 + aLum * 0.6);
         vLum = aLum; vMorph = m; vRand = aRand;
         float bottom = mix(smoothstep(uBottom, uBottom + uFade, position.y), 1.0, m);
         vAlpha = mix(1.0, bottom, t) * (1.0 - uScatter * 0.9) * (0.2 + 0.8 * t);
@@ -931,8 +918,7 @@ async function start() {
         float soft = smoothstep(0.5, 0.15, r);
         vec3 col = mix(vec3(0.10, 0.05, 0.055), uLight, vLum);    // near-black to warm white, like the B&W photo
         col = mix(col, uAccent, vLum * (1.0 - vLum) * 1.1);        // crimson only in the mid-tones
-        vec3 glyph = mix(uAccent * 1.25, uLight, vRand * 0.35);    // the code symbol glows crimson
-        col = mix(col, glyph, vMorph);
+        col = mix(col, uAccent, vMorph * 0.25 * (1.0 - vLum));     // a faint crimson flush while scrambled
         gl_FragColor = vec4(col, soft * vAlpha);
       }`,
   });
@@ -951,12 +937,18 @@ async function start() {
       pos[k * 3 + 1] = bottomY + figH - (y + Math.random()) * step;
       pos[k * 3 + 2] = 0;
       lum[k] = l;
-      if (glyph.length) {
-        const [gx, gy] = glyph[k % glyph.length];
-        alt[k * 3] = -figW / 2 + (gx + Math.random()) * step;
-        alt[k * 3 + 1] = bottomY + figH - (gy + Math.random()) * step;
+      {
+        // push each particle outward from the figure's centre by a random distance, kept inside the stage
+        const cx = 0, cy = bottomY + figH * 0.55;
+        let dx = pos[k * 3] - cx, dy = pos[k * 3 + 1] - cy;
+        const len = Math.hypot(dx, dy) || 1, ang = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
+        const dist = len * 0.45 + figH * (0.06 + Math.pow(Math.random(), 1.3) * 0.55);
+        // tanh eases far particles in toward the edge instead of piling them on it (no visible square on phones)
+        const lx = W * 0.47, ly = H * 0.47;
+        alt[k * 3] = lx * Math.tanh((cx + Math.cos(ang) * dist * 1.25) / lx);
+        alt[k * 3 + 1] = ly * Math.tanh((cy + Math.sin(ang) * dist) / ly);
         alt[k * 3 + 2] = 0;
-      } else { alt[k * 3] = pos[k * 3]; alt[k * 3 + 1] = pos[k * 3 + 1]; }
+      }
       if (!rand[k]) {
         rand[k] = Math.random();
         const a = Math.random() * Math.PI * 2, rad = (0.45 + Math.random() * 0.6) * Math.max(W, H);
